@@ -22,8 +22,4 @@ services:
     autoDeploy: true
     envVars:
       - key: PUBLIC_API_URL
-        fromService:
-          type: web
-          name: farmacia-backend
-          property: url
-        sync: false
+        value: https://farmacia-backend.onrender.com
