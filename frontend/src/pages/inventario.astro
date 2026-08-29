@@ -1,0 +1,290 @@
+---
+import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+
+let lotes: any[] = [];
+let productos: any[] = [];
+let alertas: any[] = [];
+
+try {
+  const [lotesRes, productosRes, alertasRes] = await Promise.all([
+    fetch("http://localhost:3000/api/lotes"),
+    fetch("http://localhost:3000/api/productos"),
+    fetch("http://localhost:3000/api/productos/alertas"),
+  ]);
+  if (lotesRes.ok) lotes = await lotesRes.json();
+  if (productosRes.ok) productos = await productosRes.json();
+  if (alertasRes.ok) alertas = await alertasRes.json();
+} catch (e) {
+  console.error("Error cargando inventario:", e);
+}
+---
+
+<LayoutPrincipal titulo="Inventario">
+  <main class="dashboard-container">
+    <div class="dashboard-actions">
+      <h2 class="page-title">Inventario de Lotes</h2>
+      <button class="client-btn" id="add-lote-btn" type="button">+ Nuevo Lote</button>
+    </div>
+
+    {alertas.length > 0 && (
+      <div class="alertas-section">
+        <h3>Alertas de Stock Bajo</h3>
+        <div class="alertas-list">
+          {alertas.map((a: any) => (
+            <div class="alerta-item">
+              <strong>{a.nombre}</strong> ({a.codigo}) — Stock: {a.stock_actual} / Umbral: {a.umbral_minimo}
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Lote</th>
+            <th>Producto</th>
+            <th>Adquisición</th>
+            <th>Caducidad</th>
+            <th>Precio</th>
+            <th>Bodega</th>
+            <th>Almacén</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {lotes.length === 0 ? (
+            <tr><td colspan="8" class="empty-msg">No hay lotes registrados</td></tr>
+          ) : lotes.map((l: any) => (
+            <tr>
+              <td>{l.numero_lote}</td>
+              <td>{l.producto?.nombre || l.producto_codigo}</td>
+              <td>{new Date(l.fecha_adquisicion).toLocaleDateString()}</td>
+              <td>{l.fecha_caducidad ? new Date(l.fecha_caducidad).toLocaleDateString() : '—'}</td>
+              <td>${l.precio_venta.toFixed(2)}</td>
+              <td>{l.stock_bodega}</td>
+              <td>{l.stock_almacen}</td>
+              <td>
+                {l.stock_bodega > 0 && (
+                  <button class="move-btn" data-id={l.id} data-bodega={l.stock_bodega} type="button">Mover a Almacén</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <dialog class="client-modal" id="lote-modal">
+    <form id="lote-form">
+      <div class="modal-header">
+        <h2 id="lote-modal-title">Nuevo Lote</h2>
+        <button class="close-btn" id="close-lote-modal" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <p class="modal-message" id="lote-message" role="status"></p>
+      <div class="client-fields">
+        <label>Producto<select id="lote-producto" required>
+          <option value="">Seleccionar...</option>
+          {productos.map((p: any) => (
+            <option value={p.codigo}>{p.nombre} ({p.codigo})</option>
+          ))}
+        </select></label>
+        <label>Número de Lote<input id="lote-numero" required /></label>
+        <label>Fecha de Caducidad<input id="lote-caducidad" type="date" /></label>
+        <label>Precio de Venta<input id="lote-precio" type="number" step="0.01" min="0" required /></label>
+        <label>Cantidad<input id="lote-cantidad" type="number" min="1" required /></label>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-btn" id="cancel-lote" type="button">Cancelar</button>
+        <button class="client-btn" type="submit">Registrar Lote</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="client-modal" id="move-modal">
+    <form id="move-form">
+      <div class="modal-header">
+        <h2>Mover a Almacén</h2>
+        <button class="close-btn" id="close-move-modal" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <p class="modal-message" id="move-message" role="status"></p>
+      <input type="hidden" id="move-lote-id" />
+      <div class="client-fields">
+        <label>Stock en Bodega<strong id="move-bodega-display">0</strong></label>
+        <label>Cantidad a Mover<input id="move-cantidad" type="number" min="1" required /></label>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-btn" id="cancel-move" type="button">Cancelar</button>
+        <button class="client-btn" type="submit">Mover</button>
+      </div>
+    </form>
+  </dialog>
+</LayoutPrincipal>
+
+<script>
+  const API = "http://localhost:3000/api";
+  const loteModal = document.querySelector<HTMLDialogElement>("#lote-modal")!;
+  const moveModal = document.querySelector<HTMLDialogElement>("#move-modal")!;
+  const loteForm = document.querySelector<HTMLFormElement>("#lote-form")!;
+  const moveForm = document.querySelector<HTMLFormElement>("#move-form")!;
+  const loteMsg = document.querySelector<HTMLParagraphElement>("#lote-message")!;
+  const moveMsg = document.querySelector<HTMLParagraphElement>("#move-message")!;
+
+  function setMsg(el: HTMLParagraphElement, msg = "", isError = false) {
+    el.textContent = msg;
+    el.classList.toggle("is-error", isError);
+  }
+
+  async function getError(r: Response) {
+    const d = await r.json().catch(() => ({}));
+    return d.error || "Error desconocido";
+  }
+
+  document.querySelector("#add-lote-btn")!.addEventListener("click", () => {
+    loteForm.reset();
+    setMsg(loteMsg);
+    loteModal.showModal();
+  });
+
+  ["#close-lote-modal", "#cancel-lote"].forEach(s => {
+    document.querySelector(s)!.addEventListener("click", () => loteModal.close());
+  });
+
+  loteForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = {
+      producto_codigo: (document.querySelector("#lote-producto") as HTMLSelectElement).value,
+      numero_lote: (document.querySelector("#lote-numero") as HTMLInputElement).value.trim(),
+      fecha_caducidad: (document.querySelector("#lote-caducidad") as HTMLInputElement).value || null,
+      precio_venta: parseFloat((document.querySelector("#lote-precio") as HTMLInputElement).value),
+      cantidad_ingreso: parseInt((document.querySelector("#lote-cantidad") as HTMLInputElement).value),
+    };
+    try {
+      const r = await fetch(`${API}/lotes`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(await getError(r));
+      window.location.reload();
+    } catch (err) {
+      setMsg(loteMsg, err instanceof Error ? err.message : "Error al registrar lote", true);
+    }
+  });
+
+  document.querySelectorAll<HTMLButtonElement>(".move-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id!;
+      const bodega = btn.dataset.bodega!;
+      (document.querySelector("#move-lote-id") as HTMLInputElement).value = id;
+      document.querySelector("#move-bodega-display")!.textContent = bodega;
+      (document.querySelector("#move-cantidad") as HTMLInputElement).max = bodega;
+      (document.querySelector("#move-cantidad") as HTMLInputElement).value = "";
+      setMsg(moveMsg);
+      moveModal.showModal();
+    });
+  });
+
+  ["#close-move-modal", "#cancel-move"].forEach(s => {
+    document.querySelector(s)!.addEventListener("click", () => moveModal.close());
+  });
+
+  moveForm.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const id = (document.querySelector("#move-lote-id") as HTMLInputElement).value;
+    const cantidad = parseInt((document.querySelector("#move-cantidad") as HTMLInputElement).value);
+    try {
+      const r = await fetch(`${API}/lotes/${id}/mover`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cantidad_a_mover: cantidad }),
+      });
+      if (!r.ok) throw new Error(await getError(r));
+      window.location.reload();
+    } catch (err) {
+      setMsg(moveMsg, err instanceof Error ? err.message : "Error al mover stock", true);
+    }
+  });
+</script>
+
+<style>
+  .dashboard-container {
+    background-color: #ffffff;
+    box-sizing: border-box;
+    width: min(100%, 1100px);
+    margin: 0 auto;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .dashboard-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .page-title { margin: 0; font-size: 1.4rem; color: #2e7d32; }
+  .client-btn {
+    padding: 10px 22px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.95rem;
+    transition: background-color 0.3s ease;
+  }
+  .client-btn:hover { background-color: #45a049; }
+  .alertas-section {
+    background: #fff3e0;
+    border: 1px solid #ffe0b2;
+    border-radius: 8px;
+    padding: 16px;
+  }
+  .alertas-section h3 { margin: 0 0 10px; font-size: 1rem; color: #e65100; }
+  .alertas-list { display: flex; flex-direction: column; gap: 6px; }
+  .alerta-item { font-size: 0.9rem; color: #bf360c; }
+  .table-wrapper { overflow-x: auto; }
+  .data-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+  }
+  .data-table th {
+    background: #e8f5e9;
+    color: #2e7d32;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  .data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #eee;
+  }
+  .data-table tbody tr:hover { background: #f9fdf9; }
+  .empty-msg { text-align: center; color: #999; padding: 24px; }
+  .move-btn {
+    padding: 5px 10px;
+    border: 1px solid #1976d2;
+    color: #1976d2;
+    background: white;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.82rem;
+  }
+  .move-btn:hover { background: #e3f2fd; }
+  .secondary-btn {
+    padding: 10px 16px; border: 1px solid #d6ddd7; border-radius: 6px;
+    background: #fff; color: #3f4b43; cursor: pointer; font-size: 0.95rem;
+  }
+  @media (max-width: 640px) {
+    .dashboard-container { padding: 20px; }
+    .dashboard-actions { flex-direction: column; gap: 12px; align-items: stretch; }
+    .client-btn { width: 100%; }
+    .client-fields { grid-template-columns: 1fr; }
+  }
+</style>

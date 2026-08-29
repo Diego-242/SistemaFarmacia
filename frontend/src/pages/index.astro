@@ -1,0 +1,47 @@
+---
+// src/pages/index.astro
+import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+---
+
+<LayoutPrincipal titulo="Inicio">
+
+  <div class="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+    <h1 class="text-3xl font-extrabold text-gray-800 mb-2">Bienvenido a FarmaSys</h1>
+    <p class="text-gray-500 mb-8">Sistema de gestion de farmacia, inventario y facturacion.</p>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+      <a href="/facturacion" class="bg-blue-50 p-6 rounded-lg border border-blue-100 hover:shadow-md transition">
+        <h3 class="font-bold text-blue-700 text-lg">Punto de Venta</h3>
+        <p class="text-sm text-blue-600 mt-2">Registrar ventas y generar facturas.</p>
+      </a>
+
+      <a href="/clientes" class="bg-green-50 p-6 rounded-lg border border-green-100 hover:shadow-md transition">
+        <h3 class="font-bold text-green-700 text-lg">Clientes</h3>
+        <p class="text-sm text-green-600 mt-2">Buscar, agregar o editar clientes.</p>
+      </a>
+
+      <a href="/inventario" class="bg-purple-50 p-6 rounded-lg border border-purple-100 hover:shadow-md transition">
+        <h3 class="font-bold text-purple-700 text-lg">Inventario</h3>
+        <p class="text-sm text-purple-600 mt-2">Control de lotes, stock y caducidades.</p>
+      </a>
+
+      <a href="/proveedores" class="bg-amber-50 p-6 rounded-lg border border-amber-100 hover:shadow-md transition">
+        <h3 class="font-bold text-amber-700 text-lg">Proveedores</h3>
+        <p class="text-sm text-amber-600 mt-2">Gestion de proveedores registrados.</p>
+      </a>
+
+      <a href="/compras" class="bg-indigo-50 p-6 rounded-lg border border-indigo-100 hover:shadow-md transition">
+        <h3 class="font-bold text-indigo-700 text-lg">Compras</h3>
+        <p class="text-sm text-indigo-600 mt-2">Ordenes de compra a proveedores.</p>
+      </a>
+
+      <a href="/tipos" class="bg-teal-50 p-6 rounded-lg border border-teal-100 hover:shadow-md transition">
+        <h3 class="font-bold text-teal-700 text-lg">Tipos de Producto</h3>
+        <p class="text-sm text-teal-600 mt-2">Categorias y tipos del catalogo.</p>
+      </a>
+
+    </div>
+  </div>
+
+</LayoutPrincipal>

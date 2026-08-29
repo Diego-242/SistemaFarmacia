@@ -1,0 +1,146 @@
+---
+import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+
+let tipos: any[] = [];
+try {
+  const r = await fetch("http://localhost:3000/api/tipos");
+  if (r.ok) tipos = await r.json();
+} catch (e) { console.error(e); }
+---
+
+<LayoutPrincipal titulo="Tipos de Producto">
+  <main class="dashboard-container">
+    <div class="dashboard-actions">
+      <h2 class="page-title">Tipos de Producto</h2>
+      <button class="client-btn" id="add-tipo-btn" type="button">+ Nuevo Tipo</button>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Perecible</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tipos.length === 0 ? (
+            <tr><td colspan="3" class="empty-msg">No hay tipos registrados</td></tr>
+          ) : tipos.map((t: any) => (
+            <tr>
+              <td>{t.id}</td>
+              <td>{t.nombre}</td>
+              <td>{t.es_perecible ? 'Sí' : 'No'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <dialog class="client-modal" id="tipo-modal">
+    <form id="tipo-form">
+      <div class="modal-header">
+        <h2>Nuevo Tipo de Producto</h2>
+        <button class="close-btn" id="close-tipo-modal" type="button">×</button>
+      </div>
+      <p class="modal-message" id="tipo-message" role="status"></p>
+      <div class="client-fields">
+        <label>Nombre<input id="tipo-nombre" required /></label>
+        <label class="checkbox-label">
+          <input type="checkbox" id="tipo-perecible" />
+          Es perecible
+        </label>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-btn" id="cancel-tipo" type="button">Cancelar</button>
+        <button class="client-btn" type="submit">Crear Tipo</button>
+      </div>
+    </form>
+  </dialog>
+</LayoutPrincipal>
+
+<script>
+  const API = "http://localhost:3000/api/tipos";
+  const modal = document.querySelector<HTMLDialogElement>("#tipo-modal")!;
+  const form = document.querySelector<HTMLFormElement>("#tipo-form")!;
+  const msg = document.querySelector<HTMLParagraphElement>("#tipo-message")!;
+  const nombreInput = document.querySelector<HTMLInputElement>("#tipo-nombre")!;
+  const perecibleInput = document.querySelector<HTMLInputElement>("#tipo-perecible")!;
+
+  function setMsg(m = "", isError = false) {
+    msg.textContent = m;
+    msg.classList.toggle("is-error", isError);
+  }
+
+  document.querySelector("#add-tipo-btn")!.addEventListener("click", () => {
+    form.reset();
+    setMsg();
+    modal.showModal();
+  });
+
+  ["#close-tipo-modal", "#cancel-tipo"].forEach(s => {
+    document.querySelector(s)!.addEventListener("click", () => modal.close());
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = { nombre: nombreInput.value.trim(), es_perecible: perecibleInput.checked };
+    try {
+      const r = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Error");
+      window.location.reload();
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Error al crear tipo", true);
+    }
+  });
+</script>
+
+<style>
+  .dashboard-container {
+    background-color: #ffffff;
+    box-sizing: border-box;
+    width: min(100%, 900px);
+    margin: 0 auto;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .dashboard-actions { display: flex; align-items: center; justify-content: space-between; }
+  .page-title { margin: 0; font-size: 1.4rem; color: #2e7d32; }
+  .client-btn {
+    padding: 10px 22px; background-color: #4caf50; color: white; border: none;
+    border-radius: 6px; cursor: pointer; font-size: 0.95rem;
+  }
+  .client-btn:hover { background-color: #45a049; }
+  .table-wrapper { overflow-x: auto; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .data-table th {
+    background: #e8f5e9; color: #2e7d32; padding: 10px 12px;
+    text-align: left; font-weight: 600;
+  }
+  .data-table td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+  .data-table tbody tr:hover { background: #f9fdf9; }
+  .empty-msg { text-align: center; color: #999; padding: 24px; }
+  .checkbox-label {
+    flex-direction: row !important; align-items: center; gap: 8px !important;
+  }
+  .checkbox-label input[type="checkbox"] { width: auto; }
+  .modal-actions { justify-content: flex-end; gap: 10px; margin-top: 22px; }
+  .secondary-btn {
+    padding: 10px 16px; border: 1px solid #d6ddd7; border-radius: 6px;
+    background: #fff; color: #3f4b43; cursor: pointer; font-size: 0.95rem;
+  }
+  @media (max-width: 640px) {
+    .dashboard-container { padding: 20px; }
+    .client-fields { grid-template-columns: 1fr; }
+  }
+</style>

@@ -1,0 +1,384 @@
+---
+import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+
+let lotes: any[] = [];
+try {
+  const r = await fetch("http://localhost:3000/api/lotes");
+  if (r.ok) lotes = await r.json();
+} catch (e) { console.error(e); }
+
+const lotesDisponibles = lotes.filter((l: any) => l.stock_almacen > 0);
+---
+
+<LayoutPrincipal titulo="Punto de Venta">
+  <main class="dashboard-container">
+    <h2 class="page-title">Punto de Venta</h2>
+
+    <div class="pos-layout">
+      <div class="pos-left">
+        <div class="client-section">
+          <label class="field-label">Cédula del Cliente</label>
+          <div class="search-row">
+            <input type="text" id="pos-cedula" placeholder="Ingrese cédula..." />
+            <button class="client-btn" id="search-client-btn" type="button">Buscar</button>
+          </div>
+          <div class="client-info" id="client-info" hidden>
+            <span id="client-name"></span>
+            <span id="client-plan"></span>
+            <span id="client-points"></span>
+          </div>
+        </div>
+
+        <div class="products-section">
+          <label class="field-label">Productos Disponibles</label>
+          <input type="text" id="product-search" placeholder="Buscar producto..." class="search-filter" />
+          <div class="products-list" id="products-list">
+            {lotesDisponibles.length === 0 ? (
+              <p class="empty-msg">No hay productos en almacén</p>
+            ) : lotesDisponibles.map((l: any) => (
+              <div class="product-card" data-id={l.id} data-nombre={l.producto?.nombre} data-precio={l.precio_venta} data-stock={l.stock_almacen}>
+                <div class="product-info">
+                  <strong>{l.producto?.nombre || l.producto_codigo}</strong>
+                  <span class="product-meta">Lote: {l.numero_lote} | Stock: {l.stock_almacen}</span>
+                </div>
+                <div class="product-right">
+                  <span class="product-price">${l.precio_venta.toFixed(2)}</span>
+                  <button class="add-btn" type="button">+</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div class="pos-right">
+        <div class="cart-section">
+          <h3 class="cart-title">Carrito</h3>
+          <div class="cart-items" id="cart-items">
+            <p class="empty-msg" id="cart-empty">Carrito vacío</p>
+          </div>
+          <div class="cart-summary">
+            <div class="summary-row"><span>Subtotal</span><span id="subtotal">$0.00</span></div>
+            <div class="summary-row"><span>IVA (15%)</span><span id="impuestos">$0.00</span></div>
+            <div class="summary-row points-row" id="points-row" hidden>
+              <span>Descuento puntos</span><span id="descuento">-$0.00</span>
+            </div>
+            <div class="summary-row total-row"><span>Total</span><span id="total">$0.00</span></div>
+          </div>
+          <div class="points-section" id="points-section" hidden>
+            <label class="field-label">Usar puntos (1 pto = $0.10)</label>
+            <div class="search-row">
+              <input type="number" id="points-input" min="0" value="0" />
+              <button class="secondary-btn" id="apply-points" type="button">Aplicar</button>
+            </div>
+          </div>
+          <button class="pay-btn" id="pay-btn" type="button" disabled>Generar Factura</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <dialog class="client-modal" id="result-modal">
+    <div class="modal-header">
+      <h2 id="result-title">Resultado</h2>
+      <button class="close-btn" id="close-result" type="button">×</button>
+    </div>
+    <p class="modal-message" id="result-message"></p>
+    <div class="modal-actions">
+      <button class="client-btn" id="close-result-btn" type="button">Cerrar</button>
+    </div>
+  </dialog>
+</LayoutPrincipal>
+
+<script>
+  const API = "http://localhost:3000/api";
+  let selectedClient: any = null;
+  let cart: {loteId: number; nombre: string; precio: number; cantidad: number; stock: number}[] = [];
+  let puntosDisponibles = 0;
+  let puntosUsados = 0;
+
+  const clientInput = document.querySelector<HTMLInputElement>("#pos-cedula")!;
+  const clientInfo = document.querySelector<HTMLDivElement>("#client-info")!;
+  const clientName = document.querySelector<HTMLSpanElement>("#client-name")!;
+  const clientPlan = document.querySelector<HTMLSpanElement>("#client-plan")!;
+  const clientPoints = document.querySelector<HTMLSpanElement>("#client-points")!;
+  const cartItems = document.querySelector<HTMLDivElement>("#cart-items")!;
+  const cartEmpty = document.querySelector<HTMLParagraphElement>("#cart-empty")!;
+  const subtotalEl = document.querySelector<HTMLSpanElement>("#subtotal")!;
+  const impuestosEl = document.querySelector<HTMLSpanElement>("#impuestos")!;
+  const descuentoEl = document.querySelector<HTMLSpanElement>("#descuento")!;
+  const totalEl = document.querySelector<HTMLSpanElement>("#total")!;
+  const pointsRow = document.querySelector<HTMLDivElement>("#points-row")!;
+  const pointsSection = document.querySelector<HTMLDivElement>("#points-section")!;
+  const pointsInput = document.querySelector<HTMLInputElement>("#points-input")!;
+  const payBtn = document.querySelector<HTMLButtonElement>("#pay-btn")!;
+  const resultModal = document.querySelector<HTMLDialogElement>("#result-modal")!;
+  const resultMsg = document.querySelector<HTMLParagraphElement>("#result-message")!;
+  const resultTitle = document.querySelector<HTMLHeadingElement>("#result-title")!;
+  const productSearch = document.querySelector<HTMLInputElement>("#product-search")!;
+  const productsList = document.querySelector<HTMLDivElement>("#products-list")!;
+
+  function showResult(title: string, msg: string, isError = false) {
+    resultTitle.textContent = title;
+    resultMsg.textContent = msg;
+    resultMsg.classList.toggle("is-error", isError);
+    resultModal.showModal();
+  }
+
+  document.querySelector("#close-result")!.addEventListener("click", () => resultModal.close());
+  document.querySelector("#close-result-btn")!.addEventListener("click", () => resultModal.close());
+
+  productSearch.addEventListener("input", () => {
+    const q = productSearch.value.toLowerCase();
+    productsList.querySelectorAll<HTMLDivElement>(".product-card").forEach(card => {
+      const name = (card.dataset.nombre || "").toLowerCase();
+      card.style.display = name.includes(q) ? "" : "none";
+    });
+  });
+
+  document.querySelector("#search-client-btn")!.addEventListener("click", async () => {
+    const cedula = clientInput.value.trim();
+    if (!cedula) return;
+    try {
+      const r = await fetch(`${API}/clientes/${encodeURIComponent(cedula)}`);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "No encontrado");
+      selectedClient = await r.json();
+      clientInfo.hidden = false;
+      clientName.textContent = selectedClient.nombre;
+      clientPlan.textContent = `Plan: ${selectedClient.plan}`;
+      puntosDisponibles = selectedClient.puntos || 0;
+      clientPoints.textContent = `Puntos: ${puntosDisponibles}`;
+      if (selectedClient.plan !== "NINGUNO" && puntosDisponibles > 0) {
+        pointsSection.hidden = false;
+      } else {
+        pointsSection.hidden = true;
+        puntosUsados = 0;
+        pointsInput.value = "0";
+      }
+      updateTotals();
+    } catch (err) {
+      selectedClient = null;
+      clientInfo.hidden = true;
+      showResult("Error", err instanceof Error ? err.message : "Cliente no encontrado", true);
+    }
+  });
+
+  document.querySelectorAll<HTMLButtonElement>(".add-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const card = btn.closest(".product-card")!;
+      const loteId = parseInt(card.dataset.id!);
+      const nombre = card.dataset.nombre || "";
+      const precio = parseFloat(card.dataset.precio!);
+      const stock = parseInt(card.dataset.stock!);
+      const existing = cart.find(c => c.loteId === loteId);
+      if (existing) {
+        if (existing.cantidad < stock) existing.cantidad++;
+      } else {
+        cart.push({ loteId, nombre, precio, cantidad: 1, stock });
+      }
+      renderCart();
+    });
+  });
+
+  function renderCart() {
+    cartItems.innerHTML = "";
+    if (cart.length === 0) {
+      cartItems.innerHTML = '<p class="empty-msg">Carrito vacío</p>';
+    } else {
+      cart.forEach((item, idx) => {
+        const div = document.createElement("div");
+        div.className = "cart-item";
+        div.innerHTML = `
+          <div class="cart-item-info">
+            <strong>${item.nombre}</strong>
+            <span>${item.cantidad} x $${item.precio.toFixed(2)}</span>
+          </div>
+          <div class="cart-item-actions">
+            <button class="qty-btn" data-idx="${idx}" data-dir="-1">-</button>
+            <span>${item.cantidad}</span>
+            <button class="qty-btn" data-idx="${idx}" data-dir="1">+</button>
+            <button class="remove-btn" data-idx="${idx}">×</button>
+          </div>
+        `;
+        cartItems.appendChild(div);
+      });
+      cartItems.querySelectorAll<HTMLButtonElement>(".qty-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const idx = parseInt(btn.dataset.idx!);
+          const dir = parseInt(btn.dataset.dir!);
+          cart[idx].cantidad += dir;
+          if (cart[idx].cantidad > cart[idx].stock) cart[idx].cantidad = cart[idx].stock;
+          if (cart[idx].cantidad <= 0) cart.splice(idx, 1);
+          renderCart();
+        });
+      });
+      cartItems.querySelectorAll<HTMLButtonElement>(".remove-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+          cart.splice(parseInt(btn.dataset.idx!), 1);
+          renderCart();
+        });
+      });
+    }
+    updateTotals();
+  }
+
+  function updateTotals() {
+    const subtotal = cart.reduce((sum, i) => sum + i.precio * i.cantidad, 0);
+    const iva = subtotal * 0.15;
+    const descuento = puntosUsados * 0.1;
+    const total = Math.max(0, subtotal + iva - descuento);
+    subtotalEl.textContent = `$${subtotal.toFixed(2)}`;
+    impuestosEl.textContent = `$${iva.toFixed(2)}`;
+    descuentoEl.textContent = `-$${descuento.toFixed(2)}`;
+    totalEl.textContent = `$${total.toFixed(2)}`;
+    pointsRow.hidden = puntosUsados === 0;
+    payBtn.disabled = cart.length === 0 || !selectedClient;
+  }
+
+  document.querySelector("#apply-points")!.addEventListener("click", () => {
+    const val = parseInt(pointsInput.value) || 0;
+    puntosUsados = Math.min(val, puntosDisponibles);
+    pointsInput.value = String(puntosUsados);
+    updateTotals();
+  });
+
+  document.querySelector("#pay-btn")!.addEventListener("click", async () => {
+    if (!selectedClient || cart.length === 0) return;
+    payBtn.disabled = true;
+    payBtn.textContent = "Procesando...";
+    try {
+      const body = {
+        cliente_cedula: selectedClient.cedula,
+        articulos: cart.map(c => ({ lote_id: c.loteId, cantidad: c.cantidad })),
+        puntos_a_usar: puntosUsados,
+      };
+      const r = await fetch(`${API}/facturas`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Error al facturar");
+      showResult("Factura Generada", "La venta se registró exitosamente.");
+      cart = [];
+      puntosUsados = 0;
+      puntosDisponibles = 0;
+      selectedClient = null;
+      clientInfo.hidden = true;
+      pointsSection.hidden = true;
+      renderCart();
+    } catch (err) {
+      showResult("Error", err instanceof Error ? err.message : "Error al procesar", true);
+    } finally {
+      payBtn.disabled = false;
+      payBtn.textContent = "Generar Factura";
+    }
+  });
+</script>
+
+<style>
+  .dashboard-container {
+    background-color: #ffffff;
+    box-sizing: border-box;
+    width: min(100%, 1100px);
+    margin: 0 auto;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .page-title { margin: 0; font-size: 1.4rem; color: #2e7d32; }
+  .pos-layout { display: grid; grid-template-columns: 1fr 380px; gap: 24px; }
+  .pos-left { display: flex; flex-direction: column; gap: 20px; }
+  .pos-right { display: flex; flex-direction: column; }
+  .client-section { background: #f9fdf9; padding: 16px; border-radius: 8px; border: 1px solid #e8f5e9; }
+  .field-label { font-size: 0.82rem; color: #5f6862; font-weight: 600; display: block; margin-bottom: 6px; }
+  .search-row { display: flex; gap: 8px; }
+  .search-row input {
+    flex: 1; padding: 10px 12px; border: 1px solid #d6ddd7; border-radius: 6px;
+    font-size: 0.95rem; outline: none;
+  }
+  .search-row input:focus { border-color: #4caf50; box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.16); }
+  .client-info { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+  .client-info span {
+    padding: 4px 10px; border-radius: 4px; background: #e8f5e9;
+    font-size: 0.85rem; color: #2e7d32; font-weight: 500;
+  }
+  .client-btn {
+    padding: 10px 20px; background-color: #4caf50; color: white; border: none;
+    border-radius: 6px; cursor: pointer; font-size: 0.95rem; white-space: nowrap;
+  }
+  .client-btn:hover { background-color: #45a049; }
+  .secondary-btn {
+    padding: 8px 14px; border: 1px solid #d6ddd7; border-radius: 6px;
+    background: #fff; color: #3f4b43; cursor: pointer; font-size: 0.9rem;
+  }
+  .products-section { display: flex; flex-direction: column; gap: 8px; }
+  .search-filter {
+    padding: 10px 12px; border: 1px solid #d6ddd7; border-radius: 6px;
+    font-size: 0.95rem; outline: none;
+  }
+  .search-filter:focus { border-color: #4caf50; box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.16); }
+  .products-list { display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; }
+  .product-card {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border: 1px solid #eee; border-radius: 8px; background: #fff;
+  }
+  .product-card:hover { border-color: #4caf50; background: #f9fdf9; }
+  .product-info { display: flex; flex-direction: column; gap: 2px; }
+  .product-info strong { color: #333; font-size: 0.95rem; }
+  .product-meta { color: #888; font-size: 0.8rem; }
+  .product-right { display: flex; align-items: center; gap: 10px; }
+  .product-price { font-weight: 700; color: #2e7d32; }
+  .add-btn {
+    width: 32px; height: 32px; border-radius: 6px; border: 1px solid #4caf50;
+    background: #e8f5e9; color: #2e7d32; font-size: 1.2rem; cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .add-btn:hover { background: #4caf50; color: white; }
+  .empty-msg { text-align: center; color: #999; padding: 20px; font-size: 0.9rem; }
+  .cart-section {
+    border: 1px solid #e0e0e0; border-radius: 10px; padding: 20px;
+    display: flex; flex-direction: column; gap: 14px; background: #fafafa;
+  }
+  .cart-title { margin: 0; color: #2e7d32; font-size: 1.1rem; }
+  .cart-items { display: flex; flex-direction: column; gap: 8px; max-height: 250px; overflow-y: auto; }
+  .cart-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px; background: white; border: 1px solid #eee; border-radius: 6px;
+  }
+  .cart-item-info { display: flex; flex-direction: column; gap: 2px; }
+  .cart-item-info strong { font-size: 0.9rem; }
+  .cart-item-info span { font-size: 0.8rem; color: #666; }
+  .cart-item-actions { display: flex; align-items: center; gap: 6px; }
+  .qty-btn {
+    width: 26px; height: 26px; border-radius: 4px; border: 1px solid #ccc;
+    background: white; cursor: pointer; font-size: 0.9rem; display: grid; place-items: center;
+  }
+  .qty-btn:hover { background: #f0f0f0; }
+  .remove-btn {
+    width: 26px; height: 26px; border-radius: 4px; border: 1px solid #e57373;
+    background: white; color: #c62828; cursor: pointer; font-size: 0.9rem;
+    display: grid; place-items: center; margin-left: 4px;
+  }
+  .remove-btn:hover { background: #ffebee; }
+  .cart-summary { border-top: 1px solid #ddd; padding-top: 12px; }
+  .summary-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 0.9rem; color: #555; }
+  .total-row { font-weight: 700; font-size: 1.1rem; color: #2e7d32; border-top: 1px solid #ddd; padding-top: 8px; margin-top: 4px; }
+  .points-section { padding: 10px; background: #fff; border: 1px solid #e8f5e9; border-radius: 6px; }
+  .pay-btn {
+    width: 100%; padding: 14px; border: none; border-radius: 8px;
+    background: #2e7d32; color: white; font-size: 1.05rem; font-weight: 600;
+    cursor: pointer; transition: background 0.3s;
+  }
+  .pay-btn:hover:not(:disabled) { background: #1b5e20; }
+  .pay-btn:disabled { background: #aaa; cursor: not-allowed; }
+  @media (max-width: 768px) {
+    .pos-layout { grid-template-columns: 1fr; }
+    .products-list { max-height: 300px; }
+  }
+  @media (max-width: 640px) {
+    .dashboard-container { padding: 20px; }
+  }
+</style>

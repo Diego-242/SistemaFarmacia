@@ -1,0 +1,533 @@
+---
+import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+let data,
+  plan = []; // This likely holds the count of subscribed clients
+let total; // This holds the total client count
+let error = null;
+
+try {
+  const res = await fetch("http://localhost:3000/api/clientes");
+
+  if (!res.ok) {
+    throw new Error(`HTTP error! status: ${res.status}`);
+  }
+
+  data = await res.json();
+
+  total = data.length;
+
+  // Assuming 'plan' is the count of subscribed clients
+  plan = data.filter((s: any) => s.plan != "NINGUNO").length;
+
+  console.log(plan);
+} catch (err) {
+  console.error("Failed to load clients:", err);
+  error = "No se pudieron cargar los clientes.";
+}
+
+// Calculate non-subscribed clients for the chart
+const notSubscribed = total - plan;
+
+// Calculate percentages for the pie chart, handling division by zero
+const subscribedPercentage = total > 0 ? (plan / total) * 100 : 0;
+const notSubscribedPercentage = total > 0 ? (notSubscribed / total) * 100 : 0;
+
+// Define colors
+const subscribedColor = '#4CAF50'; // Green
+const notSubscribedColor = '#f44336'; // Red
+---
+
+<LayoutPrincipal titulo="Clientes">
+  <main class="dashboard-container">
+      <div class="dashboard-actions">
+        <form class="search-section" id="search-form">
+          <label class="sr-only" for="cedula">Número de cédula</label>
+          <input id="cedula" type="text" placeholder="Ingrese el número de cédula" required />
+          <button class="client-btn" type="submit">Buscar</button>
+        </form>
+        <button class="add-client-btn" id="add-client-btn" type="button">Agregar cliente</button>
+      </div>
+
+      <div class="stats-section">
+        <div class="stat-card">
+          <h3>Total de Clientes</h3>
+          <p>{total !== undefined && total !== null ? total : 'Cargando...'}</p>
+        </div>
+        <div class="stat-card">
+          <h3>Clientes Suscritos</h3>
+          <p>{plan !== undefined && plan !== null ? plan : 'Cargando...'}</p>
+        </div>
+        <div class="stat-card">
+          <h3>Clientes No Suscritos</h3>
+          <p>{notSubscribed !== undefined && notSubscribed !== null ? notSubscribed : 'Cargando...'}</p>
+        </div>
+      </div>
+
+      <section class="chart-section" aria-labelledby="subscription-title">
+        <h3 id="subscription-title">Distribución de Suscripción</h3>
+        <div class="pie-chart-placeholder">
+          <div
+            class="pie-chart-pie"
+            style={`
+              --percentage-subscribed: ${subscribedPercentage}%;
+              --color-subscribed: ${subscribedColor};
+              --color-not-subscribed: ${notSubscribedColor};
+            `}
+          >
+            <div class="pie-chart-center">
+              <strong>{Math.round(subscribedPercentage)}%</strong>
+              <span>Suscritos</span>
+            </div>
+          </div>
+          <div class="pie-chart-legend">
+            <span class="legend-item"><i style={`background-color: ${subscribedColor};`}></i>Suscritos {plan}</span>
+            <span class="legend-item"><i style={`background-color: ${notSubscribedColor};`}></i>No suscritos {notSubscribed}</span>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <dialog class="client-modal" id="client-modal" aria-labelledby="modal-title">
+      <form id="client-form">
+        <div class="modal-header">
+          <h2 id="modal-title">Cliente</h2>
+          <button class="close-btn" id="close-modal" type="button" aria-label="Cerrar">×</button>
+        </div>
+
+        <p class="modal-message" id="modal-message" role="status"></p>
+
+        <div class="client-fields">
+          <label>Cédula<input id="modal-cedula" name="cedula" required /></label>
+          <label>Nombre<input id="modal-nombre" name="nombre" required /></label>
+          <label>Dirección<input id="modal-direccion" name="direccion" required /></label>
+          <label>Teléfono<input id="modal-telefono" name="telefono" required /></label>
+          <div class="plan-field"><span>Plan</span><strong id="modal-plan">NINGUNO</strong></div>
+        </div>
+
+        <button class="invoices-btn" type="button" disabled>Ver facturas próximamente</button>
+
+        <div class="modal-actions">
+          <button class="secondary-btn" id="cancel-modal" type="button">Cancelar</button>
+          <button class="delete-btn" id="delete-client" type="button">Eliminar</button>
+          <button class="client-btn" id="edit-client" type="button">Editar</button>
+          <button class="client-btn" id="save-client" type="submit" hidden>Guardar cambios</button>
+        </div>
+      </form>
+    </dialog>
+</LayoutPrincipal>
+
+<script>
+  const apiUrl = "http://localhost:3000/api/clientes";
+  const searchForm = document.querySelector<HTMLFormElement>("#search-form")!;
+  const searchInput = document.querySelector<HTMLInputElement>("#cedula")!;
+  const modal = document.querySelector<HTMLDialogElement>("#client-modal")!;
+  const clientForm = document.querySelector<HTMLFormElement>("#client-form")!;
+  const modalTitle = document.querySelector<HTMLHeadingElement>("#modal-title")!;
+  const modalMessage = document.querySelector<HTMLParagraphElement>("#modal-message")!;
+  const cedulaInput = document.querySelector<HTMLInputElement>("#modal-cedula")!;
+  const nombreInput = document.querySelector<HTMLInputElement>("#modal-nombre")!;
+  const direccionInput = document.querySelector<HTMLInputElement>("#modal-direccion")!;
+  const telefonoInput = document.querySelector<HTMLInputElement>("#modal-telefono")!;
+  const planValue = document.querySelector<HTMLElement>("#modal-plan")!;
+  const editButton = document.querySelector<HTMLButtonElement>("#edit-client")!;
+  const deleteButton = document.querySelector<HTMLButtonElement>("#delete-client")!;
+  const saveButton = document.querySelector<HTMLButtonElement>("#save-client")!;
+
+  type Client = {
+    cedula: string;
+    nombre: string;
+    direccion: string;
+    telefono: string;
+    plan: string;
+  };
+
+  let mode: "view" | "edit" | "create" = "view";
+  let selectedCedula = "";
+
+  function setMessage(message = "", isError = false) {
+    modalMessage.textContent = message;
+    modalMessage.classList.toggle("is-error", isError);
+  }
+
+  function setFieldsDisabled(disabled: boolean) {
+    [nombreInput, direccionInput, telefonoInput].forEach((input) => (input.disabled = disabled));
+  }
+
+  function openModal(client: Client, nextMode: "view" | "edit" | "create") {
+    mode = nextMode;
+    selectedCedula = client.cedula;
+    clientForm.reset();
+    cedulaInput.value = client.cedula;
+    nombreInput.value = client.nombre;
+    direccionInput.value = client.direccion;
+    telefonoInput.value = client.telefono;
+    planValue.textContent = client.plan || "NINGUNO";
+    cedulaInput.readOnly = nextMode !== "create";
+    setFieldsDisabled(nextMode === "view");
+    modalTitle.textContent = nextMode === "create" ? "Agregar cliente" : nextMode === "edit" ? "Editar cliente" : "Datos del cliente";
+    editButton.hidden = nextMode !== "view";
+    deleteButton.hidden = nextMode !== "view";
+    saveButton.hidden = nextMode === "view";
+    saveButton.textContent = nextMode === "create" ? "Crear cliente" : "Guardar cambios";
+    setMessage();
+    modal.showModal();
+  }
+
+  async function getError(response: Response) {
+    const data = await response.json().catch(() => ({}));
+    return data.error || "No se pudo completar la operación.";
+  }
+
+  searchForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const cedula = searchInput.value.trim();
+    if (!cedula) return;
+
+    try {
+      const response = await fetch(`${apiUrl}/${encodeURIComponent(cedula)}`);
+      if (!response.ok) throw new Error(await getError(response));
+      openModal(await response.json(), "view");
+    } catch (error) {
+      openModal({ cedula: "", nombre: "", direccion: "", telefono: "", plan: "NINGUNO" }, "view");
+      setMessage(error instanceof Error ? error.message : "No se pudo buscar el cliente.", true);
+      editButton.hidden = true;
+      deleteButton.hidden = true;
+    }
+  });
+
+  document.querySelector<HTMLButtonElement>("#add-client-btn")!.addEventListener("click", () => {
+    openModal({ cedula: "", nombre: "", direccion: "", telefono: "", plan: "NINGUNO" }, "create");
+  });
+
+  editButton.addEventListener("click", () => openModal({
+    cedula: cedulaInput.value,
+    nombre: nombreInput.value,
+    direccion: direccionInput.value,
+    telefono: telefonoInput.value,
+    plan: planValue.textContent || "NINGUNO"
+  }, "edit"));
+
+  clientForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!clientForm.reportValidity()) return;
+
+    const payload = {
+      cedula: cedulaInput.value.trim(),
+      nombre: nombreInput.value.trim(),
+      direccion: direccionInput.value.trim(),
+      telefono: telefonoInput.value.trim()
+    };
+    const url = mode === "create" ? apiUrl : `${apiUrl}/${encodeURIComponent(selectedCedula)}`;
+
+    try {
+      const response = await fetch(url, {
+        method: mode === "create" ? "POST" : "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mode === "create" ? payload : {
+          nombre: payload.nombre,
+          direccion: payload.direccion,
+          telefono: payload.telefono
+        })
+      });
+      if (!response.ok) throw new Error(await getError(response));
+      window.location.reload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo guardar el cliente.", true);
+    }
+  });
+
+  deleteButton.addEventListener("click", async () => {
+    if (!window.confirm(`¿Eliminar al cliente con cédula ${selectedCedula}? Esta acción no se puede deshacer.`)) return;
+    try {
+      const response = await fetch(`${apiUrl}/${encodeURIComponent(selectedCedula)}`, { method: "DELETE" });
+      if (!response.ok) throw new Error(await getError(response));
+      window.location.reload();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "No se pudo eliminar el cliente.", true);
+    }
+  });
+
+  ["#close-modal", "#cancel-modal"].forEach((selector) => {
+    document.querySelector<HTMLButtonElement>(selector)!.addEventListener("click", () => modal.close());
+  });
+</script>
+
+<style>
+  :global(body) {
+    background-color: #f4f7f6;
+    min-height: 100vh;
+    margin: 0;
+    padding: 32px 20px;
+    box-sizing: border-box;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    color: #333;
+  }
+
+  .dashboard-container {
+    background-color: #ffffff;
+    box-sizing: border-box;
+    width: min(100%, 900px);
+    margin: 0 auto;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+  }
+
+  .dashboard-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .search-section {
+    display: flex;
+    flex: 1;
+    gap: 12px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .search-section input[type="text"] {
+    box-sizing: border-box;
+    min-width: 0;
+    padding: 12px 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1rem;
+    flex: 1;
+    max-width: 420px;
+    outline: none;
+  }
+
+  .search-section input[type="text"]:focus {
+    border-color: #4caf50;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.16);
+  }
+
+  .client-btn {
+    padding: 12px 25px;
+    background-color: #4caf50;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background-color 0.3s ease;
+  }
+
+  .client-btn:hover {
+    background-color: #45a049;
+  }
+
+  .add-client-btn,
+  .secondary-btn,
+  .delete-btn,
+  .invoices-btn {
+    padding: 12px 16px;
+    border: 1px solid #d6ddd7;
+    border-radius: 6px;
+    background: #fff;
+    color: #3f4b43;
+    cursor: pointer;
+    font-size: 0.95rem;
+  }
+
+  .add-client-btn {
+    border-color: #4caf50;
+    color: #2e7d32;
+    white-space: nowrap;
+  }
+
+  .add-client-btn:hover {
+    background: #e8f5e9;
+  }
+
+  .stats-section {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+
+  .stat-card {
+    background-color: #e8f5e9;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  }
+
+  .stat-card h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #388e3c;
+  }
+
+  .stat-card p {
+    font-size: 1.8rem;
+    font-weight: bold;
+    margin: 10px 0 0;
+    color: #2e7d32;
+  }
+
+  .chart-section {
+    background-color: #fafafa;
+    padding: 24px;
+    border-radius: 8px;
+    text-align: center;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+  }
+
+  .chart-section h3 {
+    margin: 0;
+    font-size: 1.3rem;
+    color: #1976d2;
+  }
+
+  .pie-chart-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    margin: 20px auto 0;
+  }
+
+  .pie-chart-pie {
+    display: grid;
+    place-items: center;
+    width: 176px;
+    height: 176px;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--color-subscribed) 0 var(--percentage-subscribed),
+      var(--color-not-subscribed) var(--percentage-subscribed) 100%
+    );
+  }
+
+  .pie-chart-center {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    width: 124px;
+    height: 124px;
+    border-radius: 50%;
+    background-color: #fafafa;
+  }
+
+  .pie-chart-center strong {
+    color: #2e7d32;
+    font-size: 1.55rem;
+    line-height: 1;
+  }
+
+  .pie-chart-center span {
+    margin-top: 6px;
+    color: #69726d;
+    font-size: 0.78rem;
+  }
+
+  .pie-chart-legend {
+    display: flex;
+    gap: 16px;
+    margin: 0;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    color: #5f6862;
+    font-size: 0.82rem;
+  }
+
+  .legend-item i {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    margin-right: 6px;
+    border-radius: 50%;
+  }
+
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .invoices-btn {
+    width: 100%;
+    margin-top: 16px;
+    color: #88918b;
+    cursor: not-allowed;
+  }
+
+  .delete-btn {
+    border-color: #e57373;
+    color: #c62828;
+  }
+
+  .delete-btn:hover {
+    background: #ffebee;
+  }
+
+  @media (max-width: 640px) {
+    :global(body) {
+      padding: 16px;
+    }
+
+    .dashboard-container {
+      padding: 22px;
+      gap: 24px;
+    }
+
+    .search-section {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .dashboard-actions {
+      align-items: stretch;
+      flex-direction: column;
+    }
+
+    .search-section input[type="text"],
+    .client-btn {
+      width: 100%;
+      max-width: none;
+    }
+
+    .stats-section {
+      grid-template-columns: 1fr;
+    }
+
+    .chart-section {
+      padding: 20px 14px;
+    }
+
+    .pie-chart-legend {
+      gap: 10px;
+    }
+
+    .client-fields {
+      grid-template-columns: 1fr;
+    }
+
+    .modal-actions {
+      flex-wrap: wrap;
+    }
+
+    .modal-actions button {
+      flex: 1;
+    }
+  }
+</style>

@@ -1,0 +1,134 @@
+---
+import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+
+let clientes: any[] = [];
+let productos: any[] = [];
+try {
+  const [cliRes, prodRes] = await Promise.all([
+    fetch("http://localhost:3000/api/clientes"),
+    fetch("http://localhost:3000/api/productos"),
+  ]);
+  if (cliRes.ok) clientes = await cliRes.json();
+  if (prodRes.ok) productos = await prodRes.json();
+} catch (e) { console.error(e); }
+---
+
+<LayoutPrincipal titulo="Pedidos de Clientes">
+  <main class="dashboard-container">
+    <div class="dashboard-actions">
+      <h2 class="page-title">Pedidos de Clientes</h2>
+      <button class="client-btn" id="add-pedido-btn" type="button">+ Nuevo Pedido</button>
+    </div>
+
+    <div class="info-section">
+      <p>Los pedidos registran que un cliente necesita un producto agotado. Se quedan <strong>PENDIENTES</strong> hasta que el stock esté disponible.</p>
+    </div>
+  </main>
+
+  <dialog class="client-modal" id="pedido-modal">
+    <form id="pedido-form">
+      <div class="modal-header">
+        <h2>Nuevo Pedido</h2>
+        <button class="close-btn" id="close-pedido-modal" type="button">×</button>
+      </div>
+      <p class="modal-message" id="pedido-message" role="status"></p>
+      <div class="client-fields">
+        <label>Cliente (Cédula)<select id="pedido-cliente" required>
+          <option value="">Seleccionar...</option>
+          {clientes.map((c: any) => (
+            <option value={c.cedula}>{c.nombre} ({c.cedula})</option>
+          ))}
+        </select></label>
+        <label>Producto<select id="pedido-producto" required>
+          <option value="">Seleccionar...</option>
+          {productos.map((p: any) => (
+            <option value={p.codigo}>{p.nombre} ({p.codigo})</option>
+          ))}
+        </select></label>
+        <label>Cantidad<input id="pedido-cantidad" type="number" min="1" required /></label>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-btn" id="cancel-pedido" type="button">Cancelar</button>
+        <button class="client-btn" type="submit">Registrar Pedido</button>
+      </div>
+    </form>
+  </dialog>
+</LayoutPrincipal>
+
+<script>
+  const API = "http://localhost:3000/api/pedidos";
+  const modal = document.querySelector<HTMLDialogElement>("#pedido-modal")!;
+  const form = document.querySelector<HTMLFormElement>("#pedido-form")!;
+  const msg = document.querySelector<HTMLParagraphElement>("#pedido-message")!;
+
+  function setMsg(m = "", isError = false) {
+    msg.textContent = m;
+    msg.classList.toggle("is-error", isError);
+  }
+
+  document.querySelector("#add-pedido-btn")!.addEventListener("click", () => {
+    form.reset();
+    setMsg();
+    modal.showModal();
+  });
+
+  ["#close-pedido-modal", "#cancel-pedido"].forEach(s => {
+    document.querySelector(s)!.addEventListener("click", () => modal.close());
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = {
+      cliente_cedula: (document.querySelector("#pedido-cliente") as HTMLSelectElement).value,
+      producto_codigo: (document.querySelector("#pedido-producto") as HTMLSelectElement).value,
+      cantidad: parseInt((document.querySelector("#pedido-cantidad") as HTMLInputElement).value),
+    };
+    try {
+      const r = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || "Error");
+      setMsg("Pedido registrado exitosamente");
+      setTimeout(() => modal.close(), 1500);
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Error al registrar pedido", true);
+    }
+  });
+</script>
+
+<style>
+  .dashboard-container {
+    background-color: #ffffff;
+    box-sizing: border-box;
+    width: min(100%, 900px);
+    margin: 0 auto;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .dashboard-actions { display: flex; align-items: center; justify-content: space-between; }
+  .page-title { margin: 0; font-size: 1.4rem; color: #2e7d32; }
+  .client-btn {
+    padding: 10px 22px; background-color: #4caf50; color: white; border: none;
+    border-radius: 6px; cursor: pointer; font-size: 0.95rem;
+  }
+  .client-btn:hover { background-color: #45a049; }
+  .info-section {
+    background: #e3f2fd; padding: 16px; border-radius: 8px;
+    border: 1px solid #bbdefb; font-size: 0.9rem; color: #1565c0;
+  }
+  .info-section p { margin: 0; }
+  .secondary-btn {
+    padding: 10px 16px; border: 1px solid #d6ddd7; border-radius: 6px;
+    background: #fff; color: #3f4b43; cursor: pointer; font-size: 0.95rem;
+  }
+  @media (max-width: 640px) {
+    .dashboard-container { padding: 20px; }
+    .client-fields { grid-template-columns: 1fr; }
+  }
+</style>

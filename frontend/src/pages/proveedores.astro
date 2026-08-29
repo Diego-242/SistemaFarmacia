@@ -1,0 +1,162 @@
+---
+import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+
+let proveedores: any[] = [];
+try {
+  const r = await fetch("http://localhost:3000/api/proveedores");
+  if (r.ok) proveedores = await r.json();
+} catch (e) { console.error(e); }
+---
+
+<LayoutPrincipal titulo="Proveedores">
+  <main class="dashboard-container">
+    <div class="dashboard-actions">
+      <h2 class="page-title">Proveedores</h2>
+      <button class="client-btn" id="add-proveedor-btn" type="button">+ Nuevo Proveedor</button>
+    </div>
+
+    <div class="table-wrapper">
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Nombre</th>
+            <th>Contacto</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {proveedores.length === 0 ? (
+            <tr><td colspan="4" class="empty-msg">No hay proveedores registrados</td></tr>
+          ) : proveedores.map((p: any) => (
+            <tr>
+              <td>{p.id}</td>
+              <td>{p.nombre}</td>
+              <td>{p.contacto || '—'}</td>
+              <td>
+                <button class="delete-btn" data-id={p.id} data-nombre={p.nombre} type="button">Eliminar</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <dialog class="client-modal" id="proveedor-modal">
+    <form id="proveedor-form">
+      <div class="modal-header">
+        <h2>Nuevo Proveedor</h2>
+        <button class="close-btn" id="close-proveedor-modal" type="button">×</button>
+      </div>
+      <p class="modal-message" id="proveedor-message" role="status"></p>
+      <div class="client-fields">
+        <label>Nombre<input id="prov-nombre" required /></label>
+        <label>Contacto (opcional)<input id="prov-contacto" /></label>
+      </div>
+      <div class="modal-actions">
+        <button class="secondary-btn" id="cancel-proveedor" type="button">Cancelar</button>
+        <button class="client-btn" type="submit">Crear Proveedor</button>
+      </div>
+    </form>
+  </dialog>
+</LayoutPrincipal>
+
+<script>
+  const API = "http://localhost:3000/api/proveedores";
+  const modal = document.querySelector<HTMLDialogElement>("#proveedor-modal")!;
+  const form = document.querySelector<HTMLFormElement>("#proveedor-form")!;
+  const msg = document.querySelector<HTMLParagraphElement>("#proveedor-message")!;
+  const nombreInput = document.querySelector<HTMLInputElement>("#prov-nombre")!;
+  const contactoInput = document.querySelector<HTMLInputElement>("#prov-contacto")!;
+
+  function setMsg(m = "", isError = false) {
+    msg.textContent = m;
+    msg.classList.toggle("is-error", isError);
+  }
+
+  async function getError(r: Response) {
+    const d = await r.json().catch(() => ({}));
+    return d.error || "Error desconocido";
+  }
+
+  document.querySelector("#add-proveedor-btn")!.addEventListener("click", () => {
+    form.reset();
+    setMsg();
+    modal.showModal();
+  });
+
+  ["#close-proveedor-modal", "#cancel-proveedor"].forEach(s => {
+    document.querySelector(s)!.addEventListener("click", () => modal.close());
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = { nombre: nombreInput.value.trim(), contacto: contactoInput.value.trim() || null };
+    try {
+      const r = await fetch(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error(await getError(r));
+      window.location.reload();
+    } catch (err) {
+      setMsg(err instanceof Error ? err.message : "Error al crear proveedor", true);
+    }
+  });
+
+  document.querySelectorAll<HTMLButtonElement>(".delete-btn").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.id!;
+      const nombre = btn.dataset.nombre!;
+      if (!window.confirm(`¿Eliminar al proveedor "${nombre}"? Esta acción lo enviará a la papelera.`)) return;
+      try {
+        const r = await fetch(`${API}/${id}`, { method: "DELETE" });
+        if (!r.ok) throw new Error(await getError(r));
+        window.location.reload();
+      } catch (err) {
+        alert(err instanceof Error ? err.message : "Error al eliminar");
+      }
+    });
+  });
+</script>
+
+<style>
+  .dashboard-container {
+    background-color: #ffffff;
+    box-sizing: border-box;
+    width: min(100%, 900px);
+    margin: 0 auto;
+    padding: 32px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  .dashboard-actions { display: flex; align-items: center; justify-content: space-between; }
+  .page-title { margin: 0; font-size: 1.4rem; color: #2e7d32; }
+  .client-btn {
+    padding: 10px 22px; background-color: #4caf50; color: white; border: none;
+    border-radius: 6px; cursor: pointer; font-size: 0.95rem;
+  }
+  .client-btn:hover { background-color: #45a049; }
+  .table-wrapper { overflow-x: auto; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  .data-table th {
+    background: #e8f5e9; color: #2e7d32; padding: 10px 12px;
+    text-align: left; font-weight: 600;
+  }
+  .data-table td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+  .data-table tbody tr:hover { background: #f9fdf9; }
+  .empty-msg { text-align: center; color: #999; padding: 24px; }
+  .delete-btn {
+    padding: 5px 12px; border: 1px solid #e57373; border-radius: 4px;
+    background: #fff; color: #c62828; cursor: pointer; font-size: 0.85rem;
+  }
+  .delete-btn:hover { background: #ffebee; }
+  @media (max-width: 640px) {
+    .dashboard-container { padding: 20px; }
+  }
+</style>

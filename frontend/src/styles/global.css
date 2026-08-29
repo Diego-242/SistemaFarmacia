@@ -1,0 +1,115 @@
+@import "tailwindcss";
+
+dialog.client-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  box-sizing: border-box;
+  width: min(92vw, 520px);
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  box-shadow: 0 18px 50px rgba(20, 35, 25, 0.24);
+}
+
+dialog.client-modal::backdrop {
+  background: rgba(20, 32, 24, 0.45);
+}
+
+dialog.client-modal form {
+  padding: 24px;
+}
+
+dialog.client-modal .modal-header,
+dialog.client-modal .modal-actions {
+  display: flex;
+  align-items: center;
+}
+
+dialog.client-modal .modal-header {
+  justify-content: space-between;
+  gap: 16px;
+}
+
+dialog.client-modal .modal-header h2 {
+  margin: 0;
+  color: #2e7d32;
+  font-size: 1.25rem;
+}
+
+dialog.client-modal .close-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: #5f6862;
+  cursor: pointer;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+dialog.client-modal .close-btn:hover {
+  background: #f0f2f0;
+}
+
+dialog.client-modal .modal-message {
+  min-height: 1.25rem;
+  margin: 12px 0 0;
+  color: #5f6862;
+  font-size: 0.9rem;
+}
+
+dialog.client-modal .modal-message.is-error {
+  color: #c62828;
+}
+
+dialog.client-modal .client-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 16px;
+}
+
+dialog.client-modal .client-fields label,
+dialog.client-modal .plan-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #5f6862;
+  font-size: 0.82rem;
+}
+
+dialog.client-modal .client-fields input,
+dialog.client-modal .client-fields select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid #d6ddd7;
+  border-radius: 6px;
+  background: #fff;
+  color: #27332b;
+  font: inherit;
+}
+
+dialog.client-modal .client-fields input:disabled,
+dialog.client-modal .client-fields input:read-only {
+  background: #f5f7f5;
+  color: #667169;
+}
+
+dialog.client-modal .plan-field strong {
+  padding: 10px 11px;
+  border-radius: 6px;
+  background: #f5f7f5;
+  color: #2e7d32;
+  font-size: 0.9rem;
+}
+
+dialog.client-modal .modal-actions {
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 22px;
+}

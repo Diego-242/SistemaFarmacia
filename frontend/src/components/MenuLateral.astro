@@ -1,0 +1,50 @@
+---
+// src/components/MenuLateral.astro
+---
+
+<button id="btn-menu" class="fixed top-4 left-4 z-50 p-2 bg-gray-800 text-white rounded-md shadow-lg hover:bg-gray-700 transition-colors">
+  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
+  </svg>
+</button>
+
+<aside id="sidebar" class="fixed top-0 left-0 h-screen w-64 bg-gray-900 text-white transform -translate-x-full transition-transform duration-300 ease-in-out z-40 shadow-2xl overflow-y-auto">
+  <div class="p-6 mt-12">
+    <h2 class="text-2xl font-bold text-green-400 mb-6">FarmaSys</h2>
+
+    <nav class="space-y-1">
+      <a href="/" class="block px-4 py-2 rounded hover:bg-gray-800 transition">Inicio</a>
+
+      <div class="pt-3 pb-1 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Ventas</div>
+      <a href="/facturacion" class="block px-4 py-2 rounded hover:bg-gray-800 transition">Punto de Venta</a>
+      <a href="/pedidos" class="block px-4 py-2 rounded hover:bg-gray-800 transition">Pedidos Clientes</a>
+
+      <div class="pt-3 pb-1 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Personas</div>
+      <a href="/clientes" class="block px-4 py-2 rounded hover:bg-gray-800 transition">Clientes</a>
+      <a href="/proveedores" class="block px-4 py-2 rounded hover:bg-gray-800 transition">Proveedores</a>
+
+      <div class="pt-3 pb-1 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Inventario</div>
+      <a href="/inventario" class="block px-4 py-2 rounded hover:bg-gray-800 transition">Inventario (Lotes)</a>
+      <a href="/tipos" class="block px-4 py-2 rounded hover:bg-gray-800 transition">Tipos de Producto</a>
+
+      <div class="pt-3 pb-1 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Compras</div>
+      <a href="/compras" class="block px-4 py-2 rounded hover:bg-gray-800 transition">Órdenes de Compra</a>
+    </nav>
+  </div>
+
+  <div id="overlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden -z-10 w-screen h-screen"></div>
+</aside>
+
+<script>
+  const btnMenu = document.getElementById('btn-menu');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+
+  function toggleMenu() {
+    sidebar?.classList.toggle('-translate-x-full');
+    overlay?.classList.toggle('hidden');
+  }
+
+  btnMenu?.addEventListener('click', toggleMenu);
+  overlay?.addEventListener('click', toggleMenu);
+</script>

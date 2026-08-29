@@ -1,0 +1,31 @@
+---
+// src/layouts/LayoutPrincipal.astro
+import MenuLateral from '../components/MenuLateral.astro';
+import '../styles/global.css';
+
+// Permite que cada página le pase un título diferente a la pestaña del navegador
+const { titulo } = Astro.props;
+---
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{titulo} | FarmaSys</title>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  
+  <!-- Aquí inyectamos el menú para que exista en TODAS las páginas -->
+  <MenuLateral />
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <!-- Le damos un margen izquierdo (ml-0 md:ml-16) para que el contenido no quede debajo del botón de 3 rayitas -->
+  <main class="pt-16 px-4 md:px-8 pb-8 max-w-7xl mx-auto">
+    
+    <slot />
+    
+  </main>
+
+</body>
+</html>

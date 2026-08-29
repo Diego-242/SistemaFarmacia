@@ -1,0 +1,118 @@
+// Configuración principal
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+// 1. Clientes
+model Cliente {
+  cedula         String          @id
+  nombre         String
+  direccion      String
+  telefono       String
+  plan           String          @default("NINGUNO") 
+  puntos         Int             @default(0)
+  puntos_dorados Int             @default(0)
+  
+  deletedAt      DateTime?       // <-- NUEVO: Basurero (Soft Delete)
+
+  facturas       Factura[]       
+  pedidos        PedidoCliente[] 
+}
+
+// 2. Tipos de Productos
+model TipoProducto {
+  id           Int        @id @default(autoincrement())
+  nombre       String     
+  es_perecible Boolean    
+  productos    Producto[]
+}
+
+// 3. Productos (Catálogo)
+model Producto {
+  codigo        String          @id 
+  nombre        String
+  tipo_id       Int
+  tipo          TipoProducto    @relation(fields: [tipo_id], references: [id])
+  umbral_minimo Int             @default(10) 
+  
+  deletedAt     DateTime?       // <-- NUEVO: Basurero (Soft Delete)
+
+  lotes         Lote[]
+  pedidos       PedidoCliente[]
+}
+
+// 4. Lotes (Inventario real)
+model Lote {
+  id                Int              @id @default(autoincrement())
+  producto_codigo   String
+  producto          Producto         @relation(fields: [producto_codigo], references: [codigo])
+  numero_lote       String
+  fecha_adquisicion DateTime         @default(now())
+  fecha_caducidad   DateTime?        
+  precio_venta      Float
+  stock_bodega      Int              @default(0)
+  stock_almacen     Int              @default(0)
+  detalles_factura  DetalleFactura[]
+}
+
+// 5. Proveedores
+model Proveedor {
+  id       Int               @id @default(autoincrement())
+  nombre   String
+  contacto String?
+
+  deletedAt DateTime?        // <-- NUEVO: Basurero (Soft Delete)
+
+  compras  CompraProveedor[]
+}
+
+// 6. Compras a Proveedores
+model CompraProveedor {
+  id           Int       @id @default(autoincrement())
+  proveedor_id Int
+  proveedor    Proveedor @relation(fields: [proveedor_id], references: [id])
+  estado       String    @default("PENDIENTE") 
+  fecha        DateTime  @default(now())
+}
+
+// 7. Pedidos de Clientes
+model PedidoCliente {
+  id             Int      @id @default(autoincrement())
+  cliente_cedula String
+  cliente        Cliente  @relation(fields: [cliente_cedula], references: [cedula])
+  producto_codigo String
+  producto       Producto @relation(fields: [producto_codigo], references: [codigo])
+  cantidad       Int
+  estado         String   @default("PENDIENTE")
+}
+
+// 8. Facturas (Ventas - Cabecera)
+model Factura {
+  id               Int              @id @default(autoincrement())
+  cliente_cedula   String
+  cliente          Cliente          @relation(fields: [cliente_cedula], references: [cedula])
+  fecha            DateTime         @default(now())
+  subtotal         Float
+  impuestos        Float
+  descuento_puntos Float            @default(0) 
+  total            Float
+  estado           String           @default("VALIDA") // <-- NUEVO: VALIDA o ANULADA (Las facturas no van al basurero por ley)
+  detalles         DetalleFactura[]
+}
+
+// 9. Facturas (Ventas - Detalle)
+model DetalleFactura {
+  id              Int     @id @default(autoincrement())
+  factura_id      Int
+  factura         Factura @relation(fields: [factura_id], references: [id])
+  lote_id         Int
+  lote            Lote    @relation(fields: [lote_id], references: [id]) 
+  cantidad        Int
+  precio_unitario Float
+}
