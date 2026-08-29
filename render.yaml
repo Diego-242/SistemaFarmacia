@@ -5,7 +5,7 @@ services:
     repo: https://github.com/Diego-242/SistemaFarmacia.git
     plan: free
     rootDir: backend
-    buildCommand: pnpm install && npx prisma generate && npx prisma db push
+    buildCommand: npm install && npx prisma generate && npx prisma db push
     startCommand: node index.js
     healthCheckPath: /
     autoDeploy: true
@@ -16,7 +16,7 @@ services:
     repo: https://github.com/Diego-242/SistemaFarmacia.git
     plan: free
     rootDir: frontend
-    buildCommand: pnpm install && pnpm run build
+    buildCommand: npm install && npm run build
     startCommand: node ./dist/server/entry.mjs
     healthCheckPath: /
     autoDeploy: true
