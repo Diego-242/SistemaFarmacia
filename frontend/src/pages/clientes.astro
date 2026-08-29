@@ -1,5 +1,6 @@
 ---
 import LayoutPrincipal from '../layouts/LayoutPrincipal.astro';
+import { apiFetch } from '../lib/fetch';
 const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
 let data,
   plan = []; // This likely holds the count of subscribed clients
@@ -7,7 +8,7 @@ let total; // This holds the total client count
 let error = null;
 
 try {
-  const res = await fetch(`${API_URL}/api/clientes`);
+  const res = await apiFetch(`${API_URL}/api/clientes`);
 
   if (!res.ok) {
     throw new Error(`HTTP error! status: ${res.status}`);

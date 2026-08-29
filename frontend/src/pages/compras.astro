@@ -1,13 +1,14 @@
 ---
 import LayoutPrincipal from '../layouts/LayoutPrincipal.astro';
+import { apiFetch } from '../lib/fetch';
 const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
 
 let proveedores: any[] = [];
 let productos: any[] = [];
 try {
   const [provRes, prodRes] = await Promise.all([
-    fetch(`${API_URL}/api/proveedores`),
-    fetch(`${API_URL}/api/productos`),
+    apiFetch(`${API_URL}/api/proveedores`),
+    apiFetch(`${API_URL}/api/productos`),
   ]);
   if (provRes.ok) proveedores = await provRes.json();
   if (prodRes.ok) productos = await prodRes.json();
