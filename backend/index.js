@@ -16,6 +16,10 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.get('/', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.use('/api/clientes' , clientesRouter);
 app.use('/api/tipos' , tiposRouter);
 app.use('/api/productos' , productosRouter);
@@ -26,7 +30,7 @@ app.use('/api/compras', comprasRoutes);
 app.use('/api/pedidos', pedidosRoutes);
 
 // Levantar el servidor
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🚀 Servidor backend activo en http://localhost:${PORT}`);
 });

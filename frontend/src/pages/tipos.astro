@@ -1,9 +1,10 @@
 ---
 import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
 
 let tipos: any[] = [];
 try {
-  const r = await fetch("http://localhost:3000/api/tipos");
+  const r = await fetch(`${API_URL}/api/tipos`);
   if (r.ok) tipos = await r.json();
 } catch (e) { console.error(e); }
 ---
@@ -62,7 +63,8 @@ try {
 </LayoutPrincipal>
 
 <script>
-  const API = "http://localhost:3000/api/tipos";
+  const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
+  const API = `${API_URL}/api/tipos`;
   const modal = document.querySelector<HTMLDialogElement>("#tipo-modal")!;
   const form = document.querySelector<HTMLFormElement>("#tipo-form")!;
   const msg = document.querySelector<HTMLParagraphElement>("#tipo-message")!;

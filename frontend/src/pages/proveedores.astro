@@ -1,9 +1,10 @@
 ---
 import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
 
 let proveedores: any[] = [];
 try {
-  const r = await fetch("http://localhost:3000/api/proveedores");
+  const r = await fetch(`${API_URL}/api/proveedores`);
   if (r.ok) proveedores = await r.json();
 } catch (e) { console.error(e); }
 ---
@@ -63,7 +64,8 @@ try {
 </LayoutPrincipal>
 
 <script>
-  const API = "http://localhost:3000/api/proveedores";
+  const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
+  const API = `${API_URL}/api/proveedores`;
   const modal = document.querySelector<HTMLDialogElement>("#proveedor-modal")!;
   const form = document.querySelector<HTMLFormElement>("#proveedor-form")!;
   const msg = document.querySelector<HTMLParagraphElement>("#proveedor-message")!;

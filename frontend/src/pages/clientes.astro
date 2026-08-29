@@ -1,12 +1,13 @@
 ---
 import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
 let data,
   plan = []; // This likely holds the count of subscribed clients
 let total; // This holds the total client count
 let error = null;
 
 try {
-  const res = await fetch("http://localhost:3000/api/clientes");
+  const res = await fetch(`${API_URL}/api/clientes`);
 
   if (!res.ok) {
     throw new Error(`HTTP error! status: ${res.status}`);
@@ -117,7 +118,8 @@ const notSubscribedColor = '#f44336'; // Red
 </LayoutPrincipal>
 
 <script>
-  const apiUrl = "http://localhost:3000/api/clientes";
+  const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
+  const apiUrl = `${API_URL}/api/clientes`;
   const searchForm = document.querySelector<HTMLFormElement>("#search-form")!;
   const searchInput = document.querySelector<HTMLInputElement>("#cedula")!;
   const modal = document.querySelector<HTMLDialogElement>("#client-modal")!;

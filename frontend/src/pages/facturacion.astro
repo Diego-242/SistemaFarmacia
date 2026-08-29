@@ -1,9 +1,10 @@
 ---
 import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
 
 let lotes: any[] = [];
 try {
-  const r = await fetch("http://localhost:3000/api/lotes");
+  const r = await fetch(`${API_URL}/api/lotes`);
   if (r.ok) lotes = await r.json();
 } catch (e) { console.error(e); }
 
@@ -91,7 +92,8 @@ const lotesDisponibles = lotes.filter((l: any) => l.stock_almacen > 0);
 </LayoutPrincipal>
 
 <script>
-  const API = "http://localhost:3000/api";
+  const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
+  const API = `${API_URL}/api`;
   let selectedClient: any = null;
   let cart: {loteId: number; nombre: string; precio: number; cantidad: number; stock: number}[] = [];
   let puntosDisponibles = 0;

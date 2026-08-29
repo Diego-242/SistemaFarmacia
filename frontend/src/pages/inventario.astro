@@ -1,5 +1,6 @@
 ---
 import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
 
 let lotes: any[] = [];
 let productos: any[] = [];
@@ -7,9 +8,9 @@ let alertas: any[] = [];
 
 try {
   const [lotesRes, productosRes, alertasRes] = await Promise.all([
-    fetch("http://localhost:3000/api/lotes"),
-    fetch("http://localhost:3000/api/productos"),
-    fetch("http://localhost:3000/api/productos/alertas"),
+    fetch(`${API_URL}/api/lotes`),
+    fetch(`${API_URL}/api/productos`),
+    fetch(`${API_URL}/api/productos/alertas`),
   ]);
   if (lotesRes.ok) lotes = await lotesRes.json();
   if (productosRes.ok) productos = await productosRes.json();
@@ -124,7 +125,8 @@ try {
 </LayoutPrincipal>
 
 <script>
-  const API = "http://localhost:3000/api";
+  const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
+  const API = `${API_URL}/api`;
   const loteModal = document.querySelector<HTMLDialogElement>("#lote-modal")!;
   const moveModal = document.querySelector<HTMLDialogElement>("#move-modal")!;
   const loteForm = document.querySelector<HTMLFormElement>("#lote-form")!;

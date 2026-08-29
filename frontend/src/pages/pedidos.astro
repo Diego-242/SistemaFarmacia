@@ -1,12 +1,13 @@
 ---
 import LayoutPrincipal from '../Layouts/LayoutPrincipal.astro';
+const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
 
 let clientes: any[] = [];
 let productos: any[] = [];
 try {
   const [cliRes, prodRes] = await Promise.all([
-    fetch("http://localhost:3000/api/clientes"),
-    fetch("http://localhost:3000/api/productos"),
+    fetch(`${API_URL}/api/clientes`),
+    fetch(`${API_URL}/api/productos`),
   ]);
   if (cliRes.ok) clientes = await cliRes.json();
   if (prodRes.ok) productos = await prodRes.json();
@@ -56,7 +57,8 @@ try {
 </LayoutPrincipal>
 
 <script>
-  const API = "http://localhost:3000/api/pedidos";
+  const API_URL = import.meta.env.PUBLIC_API_URL || "http://localhost:3000";
+  const API = `${API_URL}/api/pedidos`;
   const modal = document.querySelector<HTMLDialogElement>("#pedido-modal")!;
   const form = document.querySelector<HTMLFormElement>("#pedido-form")!;
   const msg = document.querySelector<HTMLParagraphElement>("#pedido-message")!;
