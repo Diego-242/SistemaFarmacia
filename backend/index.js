@@ -31,6 +31,6 @@ app.use('/api/pedidos', pedidosRoutes);
 
 // Levantar el servidor
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor backend activo en http://localhost:${PORT}`);
 });
